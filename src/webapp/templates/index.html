@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Component Landscape</title>
+<link rel="stylesheet" href="{{ asset('style.css') }}">
+<style>
+  /* The token table: one row per word, one coloured column per retained
+     component, after the word itself and its similarity to the token asked. */
+  #t_table { border-collapse: collapse; margin-top: .8rem; }
+  #t_table th, #t_table td { border: 1px solid #ddd; padding: .35rem .5rem;
+                             text-align: center; }
+  #t_table th { font-size: .7rem; color: #555; font-weight: normal; }
+  #t_table td:first-child { text-align: left; }
+  /* Tabular figures: the values are read down a column, and they must line up. */
+  #t_table td { font-variant-numeric: tabular-nums; }
+  /* The cell colours — lvl0, g1-g4, r1-r4 — live in style.css: the run pages'
+     strong and extreme word chips carry the same scale. */
+  .legend { font-size: .85rem; color: #555; max-width: 70ch; margin: -.5rem 0 1rem; }
+  /* The export strip between the controls and the plot they act on: the
+     button, and next to it the drawn tokens — folded, with a scroll so a long
+     speaker list does not push the plot off screen when it is opened. */
+  #export_bar { display: flex; align-items: flex-start; gap: .5rem; }
+  #export_box summary { cursor: pointer; font-size: .9rem; padding-top: .35rem; }
+  #export_box .legend { margin: .3rem 0; }
+  #export_scroll { max-height: 24rem; overflow-y: auto; width: fit-content;
+                   margin-top: .5rem; }
+  /* The count in the summary as a quiet pill, in the nav-link idiom. */
+  #export_box summary .count { background: #f4f4f5; border: 1px solid var(--border);
+                               border-radius: 999px; padding: 0 .5em;
+                               font-size: .75rem; color: #444; }
+  /* The header stays put while the token list scrolls under it. Sticky and
+     border-collapse do not mix, so this table keeps its borders on the cells. */
+  #export_table { border-collapse: separate; border-spacing: 0; }
+  #export_table th { position: sticky; top: 0; z-index: 1; background: #f7f7f8;
+                     border-bottom: 1px solid var(--border); }
+  /* One dot per row, in the colour the plot's legend gives that family. */
+  #export_table i.dot { display: inline-block; width: .55em; height: .55em;
+                        border-radius: 50%; margin-right: .4em; }
+  /* The count and value columns read down, as in the token table: tabular
+     figures, centred. The value cell carries that table's colour scale. */
+  #export_table th:nth-child(n+4), #export_table td:nth-child(n+4) {
+    font-variant-numeric: tabular-nums; text-align: center; }
+</style>
+</head>
+<body>
+{% import "_agents.html" as ui with context %}
+{% import "_word_controls.html" as wc %}
+<h1>Component Landscape {% include "_nav.html" %}</h1>
+
+<div class="controls" id="landscape-controls">
+  <div class="col">
+    <b>Component &amp; phase</b>
+    <label class="num"><span>Component</span>
+      <select id="component" name="component">
+        {% for c in components %}<option value="{{ c }}"
+          {{ 'selected' if c == d.component }}>{{ c }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="num"><span>Phase</span>
+      <select id="phase" name="phase">
+        {% for p in phases %}<option
+          {{ 'selected' if p == d.phase }}>{{ p }}</option>{% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <div class="col">
+    <b>Figure</b>
+    <label class="num" title="How hard the labels are pushed off each other and off the points they name. 0 leaves every label on its word; past 150 labels on one plot the de-overlapping is skipped either way, being quadratic."><span>Label spread</span>
+      <input type="range" id="spread" value="{{ d.spread }}" min="0" max="4" step="0.25"
+             oninput="document.getElementById('spread_val').textContent = this.value">
+      <output id="spread_val">{{ d.spread }}</output></label>
+    <label class="num" title="The size the figure is drawn at, as a multiple of the default — points, labels and all."><span>Figure size</span>
+      <input type="range" id="scale" value="{{ d.scale }}" min="0.5" max="2.5" step="0.25"
+             oninput="document.getElementById('scale_val').textContent = this.value + '×'">
+      <output id="scale_val">{{ d.scale|int if d.scale == d.scale|int else d.scale }}×</output></label>
+  </div>
+
+  {# The two overlay cards read the same way down: the component's own
+     family first, then the extremes, each switch followed by what it draws.
+     The dot beside a switch is the colour the plot's legend gives it. #}
+  <div class="col">
+    <b>Speakers</b>
+    <label title="The speakers this component owns — the ones it is the strongest component of. Drawn in orange.">
+      <input type="checkbox" id="show_strong_speakers" {{ 'checked' if d.show_strong_speakers }}>
+      Strong speakers <i class="swatch" style="background: orange"></i></label>
+    <hr class="split">
+    <label title="The speakers furthest out on the component. Drawn in pink.">
+      <input type="checkbox" id="show_extreme_speakers" {{ 'checked' if d.show_extreme_speakers }}>
+      Extreme speakers <i class="swatch" style="background: deeppink"></i></label>
+    <div class="sub">
+      <label class="num"><span>N speakers</span>
+        <input type="number" id="n_extreme_speakers" value="{{ d.n_extreme_speakers }}" min="1" max="5000"
+               {{ 'disabled' if not d.show_extreme_speakers }}>
+        <button type="button" class="auto" data-auto="n_extreme_speakers"
+                title="Follow the component: as many speakers as lie beyond 3σ of the bulk of its speaker values, per drawn phase. Typing a value takes the box back.">auto &gt;3σ</button></label>
+    </div>
+  </div>
+
+  <div class="col">
+    <b>Words</b>
+    <label title="The words this component owns — the ones it is the strongest component of. Labelled in dark orange.">
+      <input type="checkbox" id="strong_labels" {{ 'checked' if d.strong_labels }}>
+      Strong words <i class="swatch" style="background: #9a3412"></i></label>
+    <div class="sub">
+      <label class="num"><span>N words</span>
+        <input type="number" id="n_strong_words" value="{{ d.n_strong_words }}" min="1" max="200"
+               {{ 'disabled' if not d.strong_labels }}></label>
+      <label title="Drop the strong words the corpus barely writes — a word written a handful of times has a vector fit on that handful. Applied before the N words cap.">
+        <input type="checkbox" id="strong_min_count_filter" {{ 'checked' if d.strong_min_count_filter }}
+               {{ 'disabled' if not d.strong_labels }}> Min word frequency in corpus</label>
+      <label class="num"><span>N occurrences</span>
+        <input type="number" id="strong_min_count" value="{{ d.strong_min_count }}" min="1" max="100000"
+               {{ 'disabled' if not (d.strong_labels and d.strong_min_count_filter) }}></label>
+      <label class="num" title="Which strong words make the cut, and the order they are listed in: the ones the corpus writes most, or the ones furthest out on the component."><span>Order by</span>
+        <select id="strong_order" {{ 'disabled' if not d.strong_labels }}>
+          {% for order in ["corpus frequency", "component strength"] %}<option
+            {{ 'selected' if order == d.strong_order }}>{{ order }}</option>{% endfor %}
+        </select></label>
+    </div>
+    <hr class="split">
+    <label title="The words furthest out on the component. Labelled in pink.">
+      <input type="checkbox" id="extreme_labels" {{ 'checked' if d.extreme_labels }}>
+      Extreme words <i class="swatch" style="background: deeppink"></i></label>
+    <div class="sub">
+      <label class="num"><span>N words</span>
+        <input type="number" id="n_extreme_words" value="{{ d.n_extreme_words }}" min="1" max="100"
+               {{ 'disabled' if not d.extreme_labels }}>
+        <button type="button" class="auto" data-auto="n_extreme_words"
+                title="Follow the component: as many labels as words beyond 3σ of the bulk — usually far more than a plot can label, so this one starts off; the box caps it at 100.">auto &gt;3σ</button></label>
+      <label title="Drop the extreme words the corpus barely writes — a word written a handful of times has a vector fit on that handful. Applied before the N words cut, so a floor costs no labels.">
+        <input type="checkbox" id="extreme_min_count_filter" {{ 'checked' if d.extreme_min_count_filter }}
+               {{ 'disabled' if not d.extreme_labels }}> Min word frequency in corpus</label>
+      <label class="num"><span>N occurrences</span>
+        <input type="number" id="extreme_min_count" value="{{ d.extreme_min_count }}" min="1" max="100000"
+               {{ 'disabled' if not (d.extreme_labels and d.extreme_min_count_filter) }}></label>
+      <label class="num" title="The order the labels are listed in — furthest out on the component's direction first, or most written first. The words drawn are the same either way."><span>Order by</span>
+        <select id="extreme_order" {{ 'disabled' if not d.extreme_labels }}>
+          {% for order in ["component strength", "corpus frequency"] %}<option
+            {{ 'selected' if order == d.extreme_order }}>{{ order }}</option>{% endfor %}
+        </select></label>
+    </div>
+  </div>
+
+  {{ wc.centroid_col(d) }}
+
+  {{ wc.nearest_col(d, landscape=true) }}
+</div>
+
+<div id="export_bar">
+  <details id="export_box" hidden>
+    <summary>Drawn tokens <span id="export_count" class="count">0</span></summary>
+    <p id="export_note" class="legend" hidden>
+      Nothing is drawn — tick an overlay above or turn the nearest-word search on.</p>
+    <div id="export_scroll"><table id="export_table" class="dataframe"></table></div>
+  </details>
+  <button id="export_btn" disabled
+          title="Download the drawn tokens, with the parameters that drew them, as CSV">
+    Export drawn tokens (CSV)</button>
+</div>
+
+<div id="status"></div>
+<div id="error"></div>
+<img id="plot" alt="Component landscape plot">
+<div id="tables"></div>
+
+<hr>
+<h2>Tweet narratives</h2>
+
+{# The prompt set, as on the run pages; no Refinement column — rewrites are
+   buttons under the grades here. The bar sits outside #tweet-controls on
+   purpose: picking other prompts is not a new retrieval. #}
+<div class="tab-card">
+  {{ ui.prompt_tabs(prompt_sets, default_prompt_set,
+                    "the narrative is written and graded with") }}
+<div class="controls tab-pane" id="tweet-controls">
+  <div class="col">
+    <b>Tweets</b>
+    <label class="num"><span>Query</span>
+      <input type="text" id="q_query" placeholder="free text — press Enter"></label>
+    <label class="num"><span>N tweets</span>
+      <input type="number" id="q_n_tweets" value="20" min="1" max="500"></label>
+    <label class="num"><span>Tweets in phase</span>
+      <select id="q_phase">
+        <option selected>all</option>
+        <option>1</option><option>2</option><option>3</option><option>4</option>
+      </select>
+    </label>
+    <label class="num"><span>Min. similarity</span>
+      <input type="range" id="q_min_similarity" value="0.3" min="0" max="0.9" step="0.05"
+             oninput="document.getElementById('q_min_similarity_val').textContent = (+this.value).toFixed(2)">
+      <output id="q_min_similarity_val">0.30</output></label>
+  </div>
+
+  <div class="col">
+    <b>Speakers</b>
+    <fieldset id="q_speakers">
+      <legend>Tweets from</legend>
+      <label><input type="radio" name="q_speakers" value="all" checked> all</label>
+      <label><input type="radio" name="q_speakers" value="strong speakers"> strong speakers</label>
+      <label><input type="radio" name="q_speakers" value="extreme speakers"> extreme speakers</label>
+    </fieldset>
+    {# The same two parameters as the centroid's, so this panel does not open on
+       a different component than the plot it sits under. #}
+    <label class="num"><span>Component</span>
+      <select id="q_component" disabled>
+        {% for c in components %}<option value="{{ c }}"
+          {{ 'selected' if c == d.component }}>{{ c }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="num"><span>N extreme speakers</span>
+      <input type="number" id="q_n_extreme" value="{{ d.n_extreme }}" min="1" max="5000" disabled>
+      <button type="button" class="auto" data-auto="q_n_extreme"
+              title="Follow the component retrieved against: as many speakers as lie beyond 3σ of the bulk of its speaker values — pooled across phases under 'all', within the phase otherwise. Typing a value takes the box back.">auto &gt;3σ</button></label>
+  </div>
+
+  <div class="col" id="agent-col">
+    <b>Agent {{ ui.models_link() }}</b>
+    {{ ui.agent_row("a_summary", "Model for summary writing") }}
+    {{ ui.agent_row("a_acueval", "Model for ACUEval grading") }}
+    {{ ui.agent_row("a_rubric", "Model for RUBRIC grading") }}
+  </div>
+</div>
+</div>
+
+<button id="q_search">Search</button>
+<button id="q_narrative_btn" disabled title="Summarise the retrieved tweets with the LLM">Get narrative</button>
+<div id="q_status"></div>
+<div id="q_error"></div>
+<div id="q_note"></div>
+<div id="q_narrative"></div>
+<div id="q_grades"></div>
+<div id="q_tweets"></div>
+
+<hr>
+<h2>Token neighbors</h2>
+<p class="legend">
+  This table shows the tokens closest to the query in the mean-centred
+  word2vec space. 
+</p>
+
+<!-- Its own controls block: the two delegated change handlers in index.js are
+     scoped to the landscape controls and to the tweet controls, and a box in
+     either would redraw the plot or re-run the tweet search on every keystroke. -->
+<div class="controls" id="token-controls">
+  <div class="col">
+    <label class="num"><span>Token</span>
+      <input type="text" id="t_query" placeholder="one word — press Enter"></label>
+    <label class="num"><span>N neighbors</span>
+      <input type="number" id="t_topn" value="10" min="1" max="50"></label>
+    <label title="Drop the neighbours the corpus barely writes — a word written a handful of times has a vector, and so component values, fit on that handful. The table then comes back shorter than N neighbors.">
+      <input type="checkbox" id="t_min_count_filter"> Min word frequency in corpus</label>
+    <label class="num"><span>N occurrences</span>
+      <input type="number" id="t_min_count" value="10" min="1" max="100000" disabled></label>
+  </div>
+</div>
+
+<button id="t_show">Show</button>
+<div id="t_error" style="color: #b91c1c"></div>
+<div id="t_note"></div>
+<table id="t_table"></table>
+
+<script>const PAGE = {{ page_json | tojson }};</script>
+<script src="{{ asset('shared.js') }}"></script>
+<script src="{{ asset('index.js') }}"></script>
+</body>
+</html>

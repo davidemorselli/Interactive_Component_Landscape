@@ -1,0 +1,37 @@
+# Pinned so the compose project name stays stable regardless of the
+# checkout directory name (which follows the repo name).
+name: ica
+
+services:
+  web:
+    build: .
+    volumes:
+      # :z = SELinux relabel; no-op on hosts without SELinux (e.g. Ubuntu)
+      - ./data:/data:z
+    environment:
+      # Needed by the "Get narrative" button only; without it that button
+      # reports the missing key and the rest of the page still works.
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      # Authenticates the encoder's model download at boot; without it the
+      # Hub warns and rate-limits, but the app still starts.
+      - HF_TOKEN=${HF_TOKEN:-}
+    ports:
+      # For local testing: http://localhost:8050.
+      # cloudflared reaches the app over the compose
+      # network as http://web:8050.
+      - "127.0.0.1:8050:8050"
+    restart: unless-stopped
+
+  # Only started when the `tunnel` profile is active: the deploy workflow
+  # passes `--profile tunnel`, and locally a plain `docker compose up`
+  # skips it. To run the tunnel locally, set COMPOSE_PROFILES=tunnel in
+  # .env (and provide TUNNEL_TOKEN).
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    depends_on:
+      - web
+    restart: unless-stopped

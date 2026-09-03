@@ -1,0 +1,49 @@
+{# Harvesting words off the landscape: the controls, and the list they fill.
+
+   Both run pages ask /words the same question with the same parameters. The
+   shared control columns are _word_controls.html macros, and the JS behind
+   the list lives in static/shared.js + static/runs.js. A page adds its own
+   sections below this one. #}
+{% import "_word_controls.html" as wc %}
+
+{# Its own controls block: the delegated handler in runs.js is scoped to it, so
+   the narrative and grading boxes further down the page do not re-run the
+   search. #}
+<div class="controls" id="word-controls">
+  <div class="col">
+    <b>Selection</b>
+    <label class="num"><span>Component</span>
+      <select id="component">
+        {% for c in components %}<option value="{{ c }}"
+          {{ 'selected' if c == d.component }}>{{ c }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="num"><span>Phase</span>
+      <select id="phase">
+        {% for p in run_phases %}<option
+          {{ 'selected' if p == d.phase }}>{{ p }}</option>{% endfor %}
+      </select>
+    </label>
+  </div>
+
+  {{ wc.word_source_card(d) }}
+
+  {# One tweet floor and one grouping for whichever source the tabs choose —
+     the same controls the landscape page keeps inside its Nearest-words
+     card. #}
+  <div class="col">
+    <b>Tweet floor &amp; grouping</b>
+    {{ wc.search_floors(d) }}
+  </div>
+</div>
+
+{# The list is what the controls above describe, redrawn as they change, the
+   way the landscape page redraws its plot — so it only ever holds one
+   component's words. Rows can be dropped, not added: a word off the landscape
+   carries its similarity, its tweet count and the centroid it was found from,
+   and a typed one would carry none of that. #}
+<span id="words_count">no words yet</span>
+<div id="q_status"></div>
+<div id="error"></div>
+
+<div id="tables"></div>

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{# One page for both sets of prompts. The tab bar leading Models & judges is
+   the choice (comparison_page.PROMPT_SETS), and the endpoints the runs below
+   are launched from and polled from follow it. The heading does not: it names
+   the page, and the tab bar under it says which set the page is on. #}
+<title>{{ page_title }}</title>
+<link rel="stylesheet" href="{{ asset('style.css') }}">
+<style>
+  #runs_box { margin-top: 1rem; }
+  /* The three tables of agents, side by side while there is room for them. */
+  #tables_row { display: flex; flex-wrap: wrap; gap: 2.5rem; }
+  #tables_row b { display: block; margin-bottom: .4rem; }
+  #tables_row table { margin-bottom: .6rem; }
+  #tables_row input[type=text] { width: 13.5rem; font: inherit; font-size: .85rem; }
+  #averages { display: flex; flex-wrap: wrap; gap: 2rem; margin-top: 1rem; }
+  #averages h3 { font-size: .95rem; margin: 0 0 .3rem; }
+  /* The run the tables belong to, on a row of its own above them. */
+  #averages h3.avg-head { flex-basis: 100%; margin: 0 0 -1rem; }
+</style>
+</head>
+<body>
+{% import "_agents.html" as ui with context %}
+{% import "_word_controls.html" as wc %}
+
+{# The three tables are the same table three times: a model and a button to
+   drop the row. The rows themselves are built by renderTable. #}
+{% macro agent_table(kind, title, add) %}
+  <div>
+    <b>{{ title }}</b>
+    <table class="dataframe">
+      <thead><tr><th>model</th><th></th></tr></thead>
+      <tbody id="{{ kind }}_body"></tbody>
+    </table>
+    <button id="{{ kind }}_add">{{ add }}</button>
+  </div>
+{% endmacro %}
+
+<h1>{{ page_title }} {% include "_nav.html" %}</h1>
+
+{% include "_words.html" %}
+
+<hr>
+<h2>Models &amp; judges {{ ui.models_link() }}</h2>
+
+{# The prompt set first, in the same card the bulk page leads its own agent
+   section with: the tab bar is the choice, and the retrieval settings and the
+   three agent tables under it are read in the light of it. One pane, shown
+   under both tabs, because a comparison is set up the same way either way;
+   what the tab changes is which prompts the models are compared on and, with
+   them, which runs the table below lists. #}
+<div class="tab-card">
+  {{ ui.prompt_tabs(prompt_sets, default_prompt_set,
+                    "the models are compared on") }}
+  <div class="tab-pane" id="judges-pane">
+    <div class="controls">
+      {{ wc.retrieval_col(d, "c_") }}
+    </div>
+
+    <div id="tables_row">
+      {{ agent_table("agents", "Summary agents", "Add agent") }}
+      {{ agent_table("acue", "ACUEval graders", "Add grader") }}
+      {{ agent_table("rubric", "RUBRIC graders", "Add grader") }}
+    </div>
+  </div>
+</div>
+
+<hr>
+<h2>Runs</h2>
+
+<button id="launch" disabled>Launch grading</button>
+<div id="r_error" style="color:#b91c1c"></div>
+<div id="runs_box">
+  <table class="dataframe" id="runs_table">
+    <thead><tr><th>id</th><th>created (UTC)</th><th>status</th><th>progress</th><th></th><th></th><th></th><th></th><th></th></tr></thead>
+    <tbody id="runs_body"></tbody>
+  </table>
+</div>
+<div id="averages"></div>
+
+<script>const PAGE = {{ page_json | tojson }};</script>
+<script src="{{ asset('shared.js') }}"></script>
+<script src="{{ asset('runs.js') }}"></script>
+<script src="{{ asset('comparison.js') }}"></script>
+</body>
+</html>

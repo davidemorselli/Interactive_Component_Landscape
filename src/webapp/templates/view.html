@@ -1,0 +1,286 @@
+{% extends "_results_page.html" %}
+
+{# Rendered by two pages: /tasks views as is, /frame_tasks views with their
+   own title passed in (webapp.task_views.view_of). #}
+{% block title %}{% if task_name %}{{ task_name }} — {% endif %}{{ view_title | default("Task " ~ task_id ~ " results") }}{% endblock %}
+
+{% block style %}
+<style>
+  /* One scroll region: the table scrolls under a fixed heading — two nested
+     scrollbars moved whichever the pointer was over. Margin becomes padding
+     because the height is the viewport's. */
+  html, body { height: 100%; }
+  body { margin: 0; padding: 1.5rem; box-sizing: border-box; overflow: hidden;
+         display: flex; flex-direction: column; }
+  /* Everything but the table keeps its own height; the table takes the rest.
+     min-height:0 is what lets it: a flex item is floored at its content's
+     height by default, and a long table would grow the box past the bottom of
+     the screen instead of scrolling inside it. */
+  body > :not(#table_box) { flex: none; }
+  /* The heading is the title, then the nav, then — pushed to the far end of the
+     line, so it is not read as one more place to go — the detail switch. */
+  h1 { display: flex; align-items: center; flex-wrap: wrap; }
+  #detail { margin-left: auto; }
+  /* The task's own name, quieter than the title; the margin is written here
+     because the flex row collapses the template's whitespace. */
+  #task_name { font-size: 1rem; font-weight: normal; color: #52525b;
+               margin: 0 .6rem; }
+  /* The switch in the heading's pill vocabulary — quiet, and tinted with the
+     app's one accent while the detail is on. */
+  #detail { font: inherit; font-size: .8rem;
+            padding: .15rem .6rem; border: 1px solid var(--border);
+            border-radius: 999px; background: #fff; color: #444;
+            white-space: nowrap; cursor: pointer; }
+  #detail:hover { background: #f4f4f5; border-color: #a1a1aa; }
+  #detail[aria-pressed="true"] { background: #eff6ff; color: var(--accent);
+                                 border-color: var(--accent); }
+  /* The summary of summaries leads the table on a tinted band closed by a
+     rule. The tint goes on the ungraded cells only: a graded cell keeps the
+     green/red it wears everywhere else. */
+  #table_box td.meta:not(.ok):not(.bad):not(.none) { background: #f4f4f5; }
+  #table_box td.meta { border-bottom: 2px solid #999; }
+  /* How often a summary was written again, and what sent it back: a count and
+     a short trail rather than a sentence, so the column stays a column. */
+  #table_box td.col-refined { font-size: .75rem; color: #52525b; }
+  /* The coverage count on the word head: quiet enough not to be read as part of
+     the column's name, and short enough that the words below still set the
+     column's width. */
+  #table_box th.col-word .coverage { font-weight: normal; font-size: .7rem;
+                                     color: #999; margin-left: .4rem; }
+  /* In place of a word: a label, typeset like the heads above it rather than
+     like the words below, so it does not read as one of them. */
+  #table_box td.meta-label { white-space: nowrap; font-size: .75rem;
+                             text-transform: uppercase; letter-spacing: .05em;
+                             color: #555; }
+  /* A frame analysis is labeled lines; a narrative holds no newline and is
+     unmoved, so the two pages share the rule. Scoped to the table and the meta
+     error: the line above them is prose written across template lines, and
+     pre-wrap would print those. */
+  #table_box td, #meta_error { white-space: pre-wrap; }
+  /* Cells to the top of their row. A summary cell runs the height of a screen
+     or more, and a row-naming cell centred against it sits half a screen below
+     the row it names — scroll to a word and the word itself is off the top. */
+  #table_box td { vertical-align: top; }
+  /* The summary column gets the width of the screen (the shared 60ch cell
+     cap is off it; the comments keep the cap), and width:100% covers the
+     other direction — a short table stopping where its text stops. */
+  #table_box table { width: 100%; }
+  #table_box .col-summary { max-width: none; }
+  #meta_error { color: #b91c1c; max-width: 75ch; }
+  /* Why the task stopped early, in full — the tasks table only has room for
+     the last line of it. */
+  #run_error { color: #b91c1c; background: #fee2e2; white-space: pre-wrap;
+               font-family: monospace; font-size: .8rem; max-width: 90ch;
+               padding: .6rem .9rem; border-radius: .4rem; }
+  /* The head names each version over its own columns, so a grade is read
+     under the summary it judged; attempt 1 is the first written. */
+  #table_box th.group-head {
+    text-align: center; font-size: .75rem; text-transform: uppercase;
+    letter-spacing: .05em; color: #666; background: #f7f7f8;
+    font-weight: normal; }
+  /* The run the selected version came out of, which the switch shows in its
+     place: quieter than the block it replaces, since what is read there is
+     which attempt said what rather than the answer itself. */
+  #table_box th.prior { color: #999; }
+  /* The attempt the selection came from, marked where it stands in the run.
+     Tint on ungraded cells only (as on the merge band); the opening rule
+     takes the accent so the mark reads from the row's other end. */
+  #table_box td.chosen:not(.ok):not(.bad):not(.none) { background: #eff6ff; }
+  #table_box td.chosen.group-start { border-left-color: var(--accent); }
+  /* Where one version's columns end and the next begins — drawn on the head and
+     on every body cell below it, so the boundary runs the length of the table. */
+  #table_box .group-start { border-left: 2px solid #999; }
+  /* The head stays put while the table scrolls — the row saying which
+     version a column grades must never scroll away. Background on the cells
+     (a transparent stuck cell shows the body through), rules as insets (a
+     collapsed border is not painted while a cell is stuck). */
+  #table_box { flex: 1; min-height: 0; overflow: auto; }
+  #table_box thead th { position: sticky; z-index: 1; background: #fff;
+                        box-shadow: inset -1px -1px 0 #ccc; }
+  #table_box thead th.group-head { background: #f7f7f8; }
+  #table_box thead th.group-start { box-shadow: inset 2px 0 0 #999,
+                                                inset -1px -1px 0 #ccc; }
+  #table_box thead tr:first-child th { top: 0; }
+  /* The second head row sticks at exactly the first row's height — a
+     fraction too low leaves a sliver the body shows through, so it sits a
+     fraction too high and covers a border already drawn. */
+  #table_box thead th.group-head { height: 1.4rem; line-height: 1.4rem;
+                                   padding: 0 .5rem; }
+  #table_box thead th.sub { top: 1.4rem; }
+  /* Detail columns out until the switch is pressed — written this way round
+     so the page never paints the full table and then drops columns. */
+  #table_box .col-rubric_comment,
+  #table_box .col-acueval_comment,
+  #table_box .col-refined,
+  #table_box .col-words,
+  #table_box .prior { display: none; }
+  #table_box table.detailed .col-rubric_comment,
+  #table_box table.detailed .col-acueval_comment,
+  #table_box table.detailed .col-refined,
+  #table_box table.detailed .col-words,
+  #table_box table.detailed .prior { display: table-cell; }
+  /* The other half of the trade: the selected version gives way to the run
+     it was selected from — showing both would be the same screenful of
+     summary twice in one row. A table with no run carries no `sel` at all
+     (version_row) and stands under either setting. */
+  #table_box table.detailed td.sel,
+  #table_box table.detailed th.sel { display: none; }
+  /* The tweets a word's summary was written from, in a modal over the table. */
+  #tweets_dialog { max-width: 75ch; max-height: 80vh; border: 1px solid var(--border);
+                   border-radius: .6rem; padding: 1rem 1.25rem; }
+  /* The column only while it is open: a bare `display: flex` on the id would
+     outrank the browser's own `dialog:not([open]) { display: none }` and leave
+     the closed dialog on the page — an empty box with a close button in it. */
+  #tweets_dialog[open] { display: flex; flex-direction: column; }
+  #tweets_dialog::backdrop { background: rgb(0 0 0 / .3); }
+  /* Room kept at the end of the title line for the close button standing in
+     it. */
+  #tweets_dialog h2 { margin: 0 0 .25rem; font-size: 1.1rem; padding-right: 1.5rem; }
+  #tweets_dialog p { color: #666; font-size: .85rem; margin: 0 0 .5rem; }
+  #tweets_dialog li { font-size: .85rem; line-height: 1.4; margin: .5rem 0; }
+  /* The list is what scrolls, not the dialog around it: a query can come back
+     with tweets enough to fill several screens, and the word being read and the
+     way out of the dialog both stay on the first one. */
+  #td_list { overflow: auto; min-height: 0; margin: 0; padding: 0 0 0 2.5rem; }
+  /* The way out, in the corner it is looked for. Esc closes the dialog too —
+     the browser sees to that — but nothing on screen said so. */
+  #td_close { position: absolute; top: .5rem; right: .6rem; margin: 0;
+              padding: 0 .3rem; border: none; background: none; color: #71717a;
+              font-size: 1.4rem; line-height: 1.2; }
+  #td_close:hover { background: #f4f4f5; color: #1a1a1a; }
+</style>
+{% endblock %}
+
+{# No CSV link here: the table below is the view of this one task, and the
+   download is offered where a task is picked out of the list — the CSV cell of
+   the tasks table on /bulk and /frames (static/bulk.js). #}
+{% block heading %}{{ view_title | default("Task " ~ task_id ~ " results") }}
+  {# What the task was called, where the person who named it will look for it.
+     Quieter than the title and not a link: it names this page rather than
+     offering anywhere to go, and the pills beside it are the things that do.
+     A task never named leaves the line as it was. #}
+  {% if task_name %}<span id="task_name">{{ task_name }}</span>{% endif %}
+  {% include "_nav.html" %}
+  {# A button rather than a checkbox: it changes the table in front of you
+     rather than recording a value to be sent anywhere, and it reads as one of
+     the heading's pills. Pressed while the detail is on. #}
+  {% if rows %}<button id="detail" aria-pressed="false" title="The graders'
+    comments, the word count, and every attempt each summary went through, in
+    the order they were written — the one it is shown by is marked">show all
+    details</button>{% endif %}{% endblock %}
+
+{# The coverage is a fact about the word column — how many of the words tried
+   are rows here — so it is written into that column's own head, where it costs
+   no line of its own (the script below). What is left for this line is what
+   there would be no table to say it on. #}
+{% block blurb %}
+{%- if not rows %}
+  {%- if meta and meta.coverage %}
+    {%- set total = meta.coverage.values() | sum %}
+    {{- meta.coverage.narratives }} of {{ total }} word{{ "" if total == 1
+    else "s" }} yielded a narrative — {{ meta.coverage.refusals }} refused,
+    {{ meta.coverage.failed }} failed.
+  {%- endif %} The task is still running, or its score floors dropped every word.
+{%- elif meta and not meta.summary and not meta.error %}
+  The summary of summaries is written once every word is through.
+{%- endif %}{% endblock %}
+
+{% block extra %}
+{% if run_error %}
+<p id="run_error">{{ run_error }}</p>
+{% endif %}
+{# Not a crash but an outcome — too few narratives to summarise, or a meta step
+   that failed — so it is said plainly rather than in the traceback's chrome. #}
+{% if meta and meta.error %}
+<p id="meta_error">{{ meta.error }}</p>
+{% endif %}
+{% endblock %}
+
+{% block script %}
+<dialog id="tweets_dialog">
+  <button id="td_close" type="button" aria-label="Close" title="Close">&times;</button>
+  <h2 id="td_title"></h2>
+  <p id="td_note"></p>
+  <ol id="td_list"></ol>
+</dialog>
+<script src="{{ asset('tweets.js') }}"></script>
+<script>
+// The task's own retrieval settings, which fetchStoredTweets (tweets.js)
+// re-runs per word.
+const RETRIEVAL = {{ retrieval | tojson }};
+// The coverage, in the head of the column it is about — it says why the
+// table is shorter than the task's word list.
+const COVERAGE = {{ (meta.coverage if meta else none) | tojson }};
+const wordHead = document.querySelector("#table_box th.col-word");
+if (COVERAGE && wordHead) {
+  const total = COVERAGE.narratives + COVERAGE.refusals + COVERAGE.failed;
+  wordHead.title = `${COVERAGE.narratives} of ${total} `
+    + `word${total === 1 ? "" : "s"} yielded a narrative — `
+    + `${COVERAGE.refusals} refused, ${COVERAGE.failed} failed`;
+  wordHead.append(Object.assign(document.createElement("span"),
+    { className: "coverage", textContent: `${COVERAGE.narratives}/${total}` }));
+}
+const dlg = document.getElementById("tweets_dialog");
+const el = id => document.getElementById(id);
+el("td_close").addEventListener("click", () => dlg.close());
+
+
+document.querySelectorAll("#table_box tbody tr").forEach(tr => {
+  // Every row but the summary of summaries, which was written from the rows
+  // below it rather than from tweets: there are none to retrieve, and its
+  // label is not a word to retrieve them by.
+  if (tr.cells[1].classList.contains("meta-label")) return;
+  const phase = tr.cells[0].textContent, word = tr.cells[1].textContent;
+  const btn = Object.assign(document.createElement("button"),
+                            { textContent: "tweets", title: "The tweets this summary was written from" });
+  btn.addEventListener("click", async () => {
+    el("td_title").textContent = `“${word}” — phase ${phase}`;
+    el("td_note").textContent = "Retrieving…";
+    el("td_list").replaceChildren();
+    dlg.showModal();
+    try {
+      const data = await fetchStoredTweets(RETRIEVAL, word, phase);
+      el("td_note").textContent = data.error || data.note || "";
+      el("td_list").replaceChildren(...(data.tweets || []).map(t =>
+        Object.assign(document.createElement("li"), { textContent: t })));
+    } catch (e) {
+      el("td_note").textContent = String(e);
+    }
+  });
+  tr.cells[1].append(" ", btn);
+});
+
+// The detail switch. The columns go by CSS; the head spans cannot — a head
+// still spanning six columns when three are gone would sit the body under
+// the wrong ones — so each head is measured once from what it covers.
+const HIDDEN = ["col-rubric_comment", "col-acueval_comment", "col-refined",
+                "col-words"];
+const detail = document.getElementById("detail");
+const heads = [...document.querySelectorAll("#table_box th.group-head")];
+const subs = [...document.querySelectorAll("#table_box th.sub")];
+// Each head is given the columns it was actually rendered over rather than an
+// equal share of them: the groups are one width today, and a head that had
+// counted on that would be the thing to fix if one of them ever grew a column.
+let at = 0;
+heads.forEach(th => {
+  const mine = subs.slice(at, at + th.colSpan);
+  at += mine.length;
+  th.dataset.full = mine.length;
+  th.dataset.compact = mine.filter(
+    c => !HIDDEN.some(h => c.classList.contains(h))).length;
+});
+function applyDetail() {
+  const on = detail.getAttribute("aria-pressed") === "true";
+  document.querySelector("#table_box table").classList.toggle("detailed", on);
+  heads.forEach(th => th.colSpan = on ? th.dataset.full : th.dataset.compact);
+}
+if (detail) {
+  applyDetail();  // the switch starts off, and the heads are told so
+  detail.addEventListener("click", () => {
+    detail.setAttribute("aria-pressed",
+                        detail.getAttribute("aria-pressed") !== "true");
+    applyDetail();
+  });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,7 @@
+{#- One grade table as /comparisons/<id> answers it, autoescaped; whitespace-
+    controlled because the string travels inside a JSON value. -#}
+<table class="dataframe"><thead><tr><th>{{ index_name }}</th>
+{%- for c in columns %}<th>{{ c }}</th>{% endfor %}</tr></thead><tbody>
+{%- for idx, cells in rows %}<tr><th>{{ idx }}</th>
+{%- for text, cls in cells %}<td class="{{ cls }}">{{ text }}</td>{% endfor %}</tr>
+{%- endfor %}</tbody></table>

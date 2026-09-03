@@ -1,0 +1,199 @@
+{# The control columns the landscape page and the run pages share, as macros
+   over `d` — webapp params.DEFAULTS, so every page opens on the same search.
+   The `disabled` states repeat the JS rules only so the controls are drawn
+   right the first time; the pages re-derive them on load either way. #}
+
+{% macro centroid_col(d) %}
+  <div class="col">
+    <b>Centroid</b>
+    {# The centroid is always taken over unit-normed, mean-centred vectors: the
+       two switches that used to offer the alternatives are gone from the card.
+       The endpoints still read both parameters — the export CSV writes them
+       among the settings a run was made with — and shared.js sends them at the
+       value the search now always runs at. #}
+    <fieldset id="centroid_source">
+      <legend>Average of</legend>
+      {% for source in ["strong speakers", "extreme speakers"] %}
+      <label><input type="radio" name="centroid_source" value="{{ source }}"
+        {{ 'checked' if source == d.centroid_source }}> {{ source }}</label>
+      {% endfor %}
+      <div class="sub">
+        <label class="num"><span>N extreme</span>
+          <input type="number" id="n_extreme" value="{{ d.n_extreme }}" min="1" max="5000"
+                 {{ 'disabled' if d.centroid_source == "strong speakers" }}>
+          <button type="button" class="auto" data-auto="n_extreme"
+                  title="Follow the component: as many speakers as lie beyond 3σ of the bulk of its speaker values, per drawn phase. Typing a value takes the box back.">auto &gt;3σ</button></label>
+      </div>
+    </fieldset>
+  </div>
+{% endmacro %}
+
+{# `landscape` adds the 'off' search state only the plot page has, and swaps
+   the grouping tooltip: grouping is display-only there, one-query-per-cluster
+   on the run pages. #}
+{% macro nearest_col(d, landscape=false) %}
+  <div class="col">
+    <b>Nearest words</b>
+    <fieldset id="word_filter">
+      <legend>Search among</legend>
+      {% for filter in (["off"] if landscape else []) + ["all words", "strong words", "extreme words"] %}
+      <label><input type="radio" name="word_filter" value="{{ filter }}"
+        {{ 'checked' if filter == d.word_filter }}> {{ filter }}</label>
+      {% endfor %}
+      <div class="sub">
+        <label class="num"><span>K extreme</span>
+          <input type="number" id="k_extreme" value="{{ d.k_extreme }}" min="1" max="10000"
+                 {{ 'disabled' if d.word_filter != "extreme words" }}>
+          <button type="button" class="auto" data-auto="k_extreme"
+                  title="Follow the component: as many words as lie beyond 3σ of the bulk of its word values. Typing a value takes the box back.">auto &gt;3σ</button></label>
+      </div>
+    </fieldset>
+    <label class="num"><span>Top n words</span>
+      <input type="number" id="topn" value="{{ d.topn }}" min="1" max="200"></label>
+    {# The floors, off the two settings above that say what is searched and how
+       much of it comes back: each drops part of that answer. #}
+    <hr class="split">
+    <label title="Drop the nearest words that are still not that near — their cosine similarity with the centroid falls below the floor. The tables can then come back shorter than Top n words.">
+      <input type="checkbox" id="similarity_filter" {{ 'checked' if d.similarity_filter }}> Min similarity with centroid</label>
+    <div class="sub">
+      <label class="num"><span>Min. similarity</span>
+        <input type="range" id="min_similarity" value="{{ d.min_similarity }}" min="0" max="0.9" step="0.05"
+               {{ 'disabled' if not d.similarity_filter }}
+               oninput="document.getElementById('min_similarity_val').textContent = (+this.value).toFixed(2)">
+        <output id="min_similarity_val">{{ "%.2f"|format(d.min_similarity) }}</output></label>
+    </div>
+    <label title="Drop the candidate words the corpus barely uses — a word written a handful of times has a vector fit on that handful. Off: every word the tokenizer keeps is a candidate.">
+      <input type="checkbox" id="min_count_filter" {{ 'checked' if d.min_count_filter }}> Min word frequency in corpus</label>
+    <div class="sub">
+      <label class="num"><span>N occurrences</span>
+        <input type="number" id="min_count" value="{{ d.min_count }}" min="1" max="100000"
+               {{ 'disabled' if not d.min_count_filter }}></label>
+    </div>
+    {# The landscape page keeps the tweet floor and the grouping in this card;
+       the run pages render them once, below the word-source tabs, applying to
+       whichever source is chosen (search_floors). #}
+    {% if landscape %}{{ search_floors(d, landscape=true) }}{% endif %}
+  </div>
+{% endmacro %}
+
+{# The tweet floor and the display grouping, shared by every word source: the
+   words enough tweets sit close to, then clusters of similar words. Rendered
+   inside the landscape page's Nearest-words card, and as a card of its own on
+   the run pages. #}
+{% macro search_floors(d, landscape=false) %}
+    <label title="Drop the words the corpus has too few tweets close to — closeness read in the sentence-encoder space the tweets are embedded in, not the word2vec space the words were found in. The lists then come back shorter. On, every word also shows how many tweets of its phase are within the floor, which is the count this reads. Each new word costs a scan of the corpus (~0.15s), cached afterwards.">
+      <input type="checkbox" id="tweet_filter" {{ 'checked' if d.tweet_filter }}> Min close tweets in sentence-encoder space</label>
+    <div class="sub">
+      <label class="num"><span>N tweets</span>
+        <input type="number" id="word_min_tweets" value="{{ d.word_min_tweets }}" min="1" max="500"
+               {{ 'disabled' if not d.tweet_filter }}></label>
+      <label class="num" title="How close a tweet must be to the word in the sentence-encoder space — the floor the counts shown next to every word are taken at.">
+        <span>Tweets within</span>
+        <input type="range" id="word_min_similarity" value="{{ d.word_min_similarity }}" min="0" max="0.9" step="0.05"
+               {{ 'disabled' if not d.tweet_filter }}
+               oninput="document.getElementById('word_min_similarity_val').textContent = (+this.value).toFixed(2)">
+        <output id="word_min_similarity_val">{{ "%.2f"|format(d.word_min_similarity) }}</output></label>
+    </div>
+    {% set group_title = "Group the found words in the lists under the plot into clusters of similar words — words whose average pairwise similarity clears the floor share a row. Display only: the plot and the CSV export keep every word on its own."
+       if landscape else
+       "Group the found words into clusters of similar words — one retrieval query (and one narrative) per cluster instead of per word. Words whose average similarity clears the floor share a row; the floors still apply to each word on its own, before grouping." %}
+    {# And the grouping, which acts on whatever the floors left. #}
+    <hr class="split">
+    <label title="{{ group_title }}">
+      <input type="checkbox" id="group_words" {{ 'checked' if d.group_words }}> Group similar words</label>
+    <div class="sub">
+      <label class="num"><span>Min. similarity</span>
+        <input type="range" id="group_similarity" value="{{ d.group_similarity }}" min="0" max="0.9" step="0.05"
+               {{ 'disabled' if not d.group_words }}
+               oninput="document.getElementById('group_similarity_val').textContent = (+this.value).toFixed(2)">
+        <output id="group_similarity_val">{{ "%.2f"|format(d.group_similarity) }}</output></label>
+    </div>
+{% endmacro %}
+
+{# One word-family pane of the tab card below, strong or extreme: the same
+   settings the landscape page draws that family's labels with, plus the run
+   pages' tweet floor and grouping. The controls' ids all follow the
+   `{{ family }}_` pattern; the few places the families differ are the inline
+   conditionals. #}
+{% macro family_pane(d, family) %}
+    <div class="tab-pane" id="pane_{{ family }}" {{ 'hidden' if d.word_source != family ~ " words" }}>
+      <div class="col">
+        <label class="num"><span>N words</span>
+          <input type="number" id="n_{{ family }}_words" value="{{ d['n_' ~ family ~ '_words'] }}"
+                 min="1" max="{{ 200 if family == 'strong' else 100 }}">
+          {% if family == "extreme" %}
+          <button type="button" class="auto" data-auto="n_extreme_words"
+                  title="Follow the component: as many words as lie beyond 3σ of the bulk of its word values. Typing a value takes the box back; the box caps it at 100.">auto &gt;3σ</button>
+          {% endif %}</label>
+        <label title="Drop the {{ family }} words the corpus barely writes — a word written a handful of times has a vector fit on that handful. Applied before the N words cut, so a floor costs no words.">
+          <input type="checkbox" id="{{ family }}_min_count_filter" {{ 'checked' if d[family ~ '_min_count_filter'] }}> Min word frequency in corpus</label>
+        <div class="sub">
+          <label class="num"><span>N occurrences</span>
+            <input type="number" id="{{ family }}_min_count" value="{{ d[family ~ '_min_count'] }}" min="1" max="100000"
+                   {{ 'disabled' if not d[family ~ '_min_count_filter'] }}></label>
+        </div>
+        {# Not the same tooltip: the strong order is applied before the N words
+           cap and so picks the words, the extreme ranking already did. #}
+        {% if family == "strong" %}
+        <label class="num" title="Which strong words make the cut, and the order they are listed in: the ones the corpus writes most, or the ones furthest out on the component."><span>Order by</span>
+        {% else %}
+        <label class="num" title="The order the words are listed in — furthest out on the component's direction first (a list the frequency floor forced into the opposite pole puts that pole last), or most written first. The words found are the same either way."><span>Order by</span>
+        {% endif %}
+          <select id="{{ family }}_order">
+            {% for order in (["corpus frequency", "component strength"] if family == "strong"
+                             else ["component strength", "corpus frequency"]) %}<option
+              {{ 'selected' if order == d[family ~ '_order'] }}>{{ order }}</option>{% endfor %}
+          </select></label>
+      </div>
+    </div>
+{% endmacro %}
+
+{# The run pages' word source as a card with tabs; only the chosen source's
+   settings are on screen. The radios hidden inside the tabs are what
+   collect() and the saved state read. The landscape page renders the search
+   columns directly and never sees this card. #}
+{% macro word_source_card(d) %}
+  <div class="tab-card">
+    <div class="tab-bar"
+         title="Where the list comes from: the search for the words nearest the phase centroid, or the component's own strong / extreme words, exactly as the landscape page labels them.">
+      {% for source, name in [("centroid", "Centroid search"),
+                              ("strong words", "Strong words"),
+                              ("extreme words", "Extreme words")] %}
+      <label><input type="radio" name="word_source" value="{{ source }}"
+        {{ 'checked' if source == d.word_source }}> {{ name }}</label>
+      {% endfor %}
+    </div>
+    <div class="tab-pane" id="pane_centroid" {{ 'hidden' if d.word_source != "centroid" }}>
+      {{ centroid_col(d) }}
+      {{ nearest_col(d) }}
+    </div>
+    {{ family_pane(d, "strong") }}
+    {{ family_pane(d, "extreme") }}
+  </div>
+{% endmacro %}
+
+{# The retrieval settings a run reads: how many tweets a summary is written
+   from, how close they must be, and whose tweets they may be. `prefix` keeps
+   the two run pages' controls apart ('b_' / 'c_'). #}
+{% macro retrieval_col(d, prefix) %}
+  <div class="col">
+    <b>Tweets</b>
+    <label class="num"><span>N tweets</span>
+      <input type="number" id="{{ prefix }}n_tweets" value="20" min="1" max="500"></label>
+    <label class="num"><span>Min. similarity</span>
+      <input type="range" id="{{ prefix }}min_similarity" value="0.3" min="0" max="0.9" step="0.05"
+             oninput="document.getElementById('{{ prefix }}min_similarity_val').textContent = (+this.value).toFixed(2)">
+      <output id="{{ prefix }}min_similarity_val">0.30</output></label>
+    <fieldset id="{{ prefix }}speakers_box"
+              title="Restrict retrieval to the speakers of the component selected above — the same filter as the tweet narratives of the landscape page. With all speakers, a word's tweets come from the whole corpus, and the component only contributes its words.">
+      <legend>Tweets from</legend>
+      <label><input type="radio" name="{{ prefix }}speakers" value="all" checked> all speakers</label>
+      <label><input type="radio" name="{{ prefix }}speakers" value="strong speakers"> strong speakers</label>
+      <label><input type="radio" name="{{ prefix }}speakers" value="extreme speakers"> extreme speakers</label>
+    </fieldset>
+    <label class="num"><span>N extreme speakers</span>
+      <input type="number" id="{{ prefix }}n_extreme" value="{{ d.n_extreme }}" min="1" max="5000" disabled>
+      <button type="button" class="auto" data-auto="{{ prefix }}n_extreme"
+              title="Follow the component selected above: as many speakers as lie beyond 3σ of the bulk of its speaker values, per phase of the harvested words. Typing a value takes the box back.">auto &gt;3σ</button></label>
+  </div>
+{% endmacro %}

@@ -1,0 +1,57 @@
+{# The shape the result views share: a heading with its way back and its CSV,
+   a line for the pages that have something to say when they are empty, and —
+   as the default content — the table itself, one (text, colour) pair per cell,
+   laid out here. A view fills the blocks and nothing else; one with another
+   shape overrides `content`. #}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{% endblock %}</title>
+<link rel="stylesheet" href="{{ asset('style.css') }}">
+{% block style %}{% endblock %}
+</head>
+<body>
+<h1>{% block heading %}{% endblock %}</h1>
+
+{# A view with nothing to say above its table leaves no empty line there. #}
+{% set blurb = self.blurb() | trim if self.blurb is defined %}
+{% if blurb %}<p>{{ blurb }}</p>{% endif %}
+
+{% block extra %}{% endblock %}
+
+{% block content %}
+<div id="table_box">
+  <table class="dataframe">
+    <thead>
+      {% if groups %}
+      {# The columns of one summary version under the one header naming it, so a
+         grade is read under the summary it graded rather than by its suffix. #}
+      <tr>
+        {% for c in lead %}<th rowspan="2" class="lead {{ col_class(c) }}">{{ c }}</th>{% endfor %}
+        {% for g in groups %}
+        <th class="group-head group-start {{ g.cls }}"
+            colspan="{{ g.columns|length }}">{{ g.label }}</th>
+        {% endfor %}
+      </tr>
+      <tr>
+        {% for g in groups %}{% for c in g.columns %}
+        <th class="sub {{ g.cls }}{{ ' group-start' if loop.first }} {{ col_class(c) }}">{{ c }}</th>
+        {% endfor %}{% endfor %}
+      </tr>
+      {% else %}
+      <tr>{% for c in columns %}<th class="{{ col_class(c) }}">{{ c }}</th>{% endfor %}</tr>
+      {% endif %}
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>{% for text, cls in row %}<td class="{{ cls }}">{{ text }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+{% block script %}{% endblock %}
+</body>
+</html>

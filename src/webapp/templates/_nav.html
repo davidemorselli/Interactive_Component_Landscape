@@ -1,0 +1,10 @@
+{# The app's pages, linked in one fixed order from every heading. The page
+   being looked at is left out — its own title just said its name — so there
+   is nothing to mark as current and no back arrows to decode. #}
+{# Both run pages cover both sets of prompts now — each has its own tab bar,
+   where narratives and frames are told apart, so there is one link here for
+   each pair rather than one per set. #}
+{% for href, label in [("/", "Landscape"), ("/bulk", "Bulk"),
+                       ("/comparison", "LLM comparison"), ("/prompts", "Prompts")]
+   if request.path != href %}<a href="{{ href }}">{{ label }}</a>
+{% endfor %}

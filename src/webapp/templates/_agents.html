@@ -1,0 +1,36 @@
+{# The agent boxes both pages share. Import `with context`, so the macros see
+   the role defaults the route passes to the template. #}
+
+{# Where to shop for a model identifier: OpenRouter's list, filtered to text
+   models under $1/M in and $2/M out, ordered most capable first. Sits next to
+   the heading of every section that picks an agent. #}
+{% macro models_link() %}
+<a class="models-link" target="_blank" rel="noopener"
+   href="https://openrouter.ai/models?output_modalities=text&order=intelligence-high-to-low&max_price=1&max_output_price=2&variant=standard">browse models ↗</a>
+{% endmacro %}
+
+{# A model box: free text, starting on its role's default. Deliberately no
+   suggestion list — a hand-kept menu of seven was a stale answer to what the
+   "browse models ↗" link answers properly. #}
+{% macro agent_row(id, label) %}
+    <label><span>{{ label }}</span>
+      <input type="text" id="{{ id }}_model"
+             value="{{ default_summary_model if 'summary' in id
+                       else default_acueval_model if 'acueval' in id
+                       else default_grader_model }}"
+             placeholder="model identifier"></label>
+{% endmacro %}
+
+{# The prompt-set tab bar every run page leads its agent section with. The
+   radios inside are what the saved state and the scripts read; what follows
+   from the choice — endpoints, renames — is the page's business (runs.js).
+   `what` names, in the page's own words, what the set is spent on. #}
+{% macro prompt_tabs(sets, chosen, what) %}
+  <div class="tab-bar"
+       title="Which prompts {{ what }}: the narrative prompts, which explain what each word refers to in the tweets retrieved for it, or the Entman frame-analysis prompts, which report the frames those tweets recur in. The controls below are the same either way, and the table at the foot of the page shows the runs of the set chosen here.">
+    {% for key, set in sets.items() %}
+    <label><input type="radio" name="prompts" value="{{ key }}"
+      {{ 'checked' if key == chosen }}> {{ set.label }}</label>
+    {% endfor %}
+  </div>
+{% endmacro %}

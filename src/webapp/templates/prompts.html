@@ -1,0 +1,93 @@
+{% extends "_results_page.html" %}
+
+{# Every prompt the app sends, to read rather than run (webapp.prompts_page).
+   One tab card, as the run pages choose their prompt set: a tab per set, its
+   pane holding the set's levels and refinements as subparts. Each prompt is
+   a closed details block, so a pane opens as an index of the set's prompts
+   and each unfolds in place. #}
+{% block title %}Prompts{% endblock %}
+
+{% block style %}
+<style>
+  /* Reading width: these are pages of prose, not a table. */
+  body { max-width: 95ch; }
+  /* The panes hold headed groups, not the run pages' control columns. */
+  .tab-pane { display: block; }
+  /* The tab bar is the choice: the pane of the set not chosen leaves the
+     screen with its tab, with no script to ask. */
+  .tab-card:has(input[value="frames"]:checked) #pane_narratives,
+  .tab-card:has(input[value="narratives"]:checked) #pane_frames { display: none; }
+  /* A subpart under its set, in the .sub idiom the control panels use:
+     indented and tied to the pane by a rule in the colour the set's tab
+     wears. */
+  .level { margin: .4rem 0 1.4rem .2rem; padding-left: 1rem;
+           border-left: 2px solid var(--set, var(--border)); }
+  .level:last-child { margin-bottom: .2rem; }
+  #pane_frames { --set: var(--frames); }
+  #pane_narratives { --set: var(--accent); }
+  .level h3 { font-size: .95rem; margin: 0 0 .2rem; }
+  .note { color: #666; font-size: .85rem; margin: 0 0 .6rem;
+          font-weight: normal; }
+  h3 .note { display: inline; }
+  /* Against the pane's tint, the blocks get their own ground back. */
+  details { border: 1px solid var(--pane-edge, #e7e7ea); border-radius: .5rem;
+            margin: .5rem 0; background: #fff; }
+  summary { cursor: pointer; padding: .45rem .9rem; font-size: .9rem;
+            font-weight: 600; }
+  summary:hover { background: #f4f4f5; border-radius: .5rem; }
+  summary .note { display: inline; margin-left: .4rem; }
+  details[open] > summary { border-bottom: 1px solid var(--rule); }
+  /* One block per chat turn, its role in the corner — the worked examples of
+     a decomposition are user/assistant pairs, and the label is what says so. */
+  .turn { padding: .6rem .9rem .8rem; }
+  .turn + .turn { border-top: 1px dashed var(--border); }
+  .role { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em;
+          color: #666; }
+  /* The text as sent, line for line, but in the reading face: the page is for
+     reading the prompts, and a screenful of monospace prose is not read. */
+  .turn pre { margin: .25rem 0 0; white-space: pre-wrap;
+              overflow-wrap: anywhere; font-family: inherit;
+              font-size: .85rem; line-height: 1.5; }
+  .same { padding: .6rem .9rem; margin: 0; color: #666; font-style: italic;
+          font-size: .85rem; }
+</style>
+{% endblock %}
+
+{% block heading %}Prompts
+  {% include "_nav.html" %}{% endblock %}
+
+{% block blurb %}Every prompt the app sends, built by the code that sends it —
+⟨angle brackets⟩ stand where a run's data goes. A refinement critique is no
+conversation of its own: it is said to the writer as the next turn of its
+writing conversation, replayed with the answer as the model's own turn.{% endblock %}
+
+{% block content %}
+<div class="tab-card">
+  <div class="tab-bar"
+       title="Which set of prompts to read: the Entman frame-analysis prompts, which report the frames the retrieved tweets recur in, or the narrative prompts, which explain what each word refers to in the tweets retrieved for it.">
+    {% for set in sets %}
+    <label><input type="radio" name="prompts" value="{{ set.key }}"
+      {{ 'checked' if set.key == default_set }}> {{ set.label }}</label>
+    {% endfor %}
+  </div>
+  {% for set in sets %}
+  <div class="tab-pane" id="pane_{{ set.key }}">
+    {% for group in set.groups %}
+    <div class="level">
+      <h3>{{ group.title }}<span class="note"> — {{ group.note }}</span></h3>
+      {% for prompt in group.prompts %}
+      <details>
+        <summary>{{ prompt.name }}{% if prompt.note %}<span class="note">— {{ prompt.note }}</span>{% endif %}</summary>
+        {% if prompt.same %}<p class="same">{{ prompt.same }}</p>{% endif %}
+        {% for role, text in prompt.turns %}
+        <div class="turn"><span class="role">{{ role }}</span>
+          <pre>{{ text }}</pre></div>
+        {% endfor %}
+      </details>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

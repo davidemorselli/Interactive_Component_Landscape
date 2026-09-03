@@ -1,0 +1,284 @@
+/* One interactive accent throughout — checks, radios, ranges, focus rings,
+   links and the buttons that start work. The rust on the narrative and the
+   green/red of the grades are semantic colours, not this one. */
+:root { --accent: #1d4ed8; --border: #d4d4d8; --rule: #e5e7eb;
+        /* The three families a surface can belong to, in the colours the plot
+           already draws them in, so a tab wears its legend entry's colour.
+           Frames has no plot to borrow from and takes teal — the one hue left
+           that is neither of these two nor the green/red the grades judge in. */
+        --strong: #9a3412;    /* the component's own, as the plot labels them */
+        --extreme: #ff1493;   /* deeppink: furthest out on the component */
+        --frames: #0f766e; }  /* the Entman frame-analysis prompts */
+body { font-family: system-ui, sans-serif; margin: 1.5rem; color: #1a1a1a; }
+h1 { font-size: 1.3rem; margin: 0 0 1rem; }
+/* The links beside a heading — the nav and a page's own extras — as quiet
+   pills, so they read as places to go rather than as part of the title. */
+h1 a { font-size: .8rem; font-weight: normal; margin-left: .6rem;
+       padding: .15rem .6rem; border: 1px solid var(--border);
+       border-radius: 999px; text-decoration: none; color: #444;
+       white-space: nowrap; }
+h1 a:hover { background: #f4f4f5; border-color: #a1a1aa; }
+h2 { font-size: 1.15rem; margin: 0 0 1rem; }
+a { color: var(--accent); }
+hr { border: none; border-top: 1px solid var(--rule); margin: 2.5rem 0 1.5rem; }
+
+input { accent-color: var(--accent); }
+input[type=text], input[type=number], select {
+  font: inherit; font-size: .9rem; background: #fff;
+  border: 1px solid var(--border); border-radius: .35rem; padding: .15rem .45rem; }
+button { font: inherit; font-size: .9rem; padding: .3rem .9rem; margin-right: .5rem;
+         background: #fff; border: 1px solid var(--border); border-radius: .4rem;
+         cursor: pointer; }
+button:hover:not(:disabled) { background: #f4f4f5; border-color: #a1a1aa; }
+button:disabled { color: #a1a1aa; cursor: default; background: #fafafa; }
+button:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px; }
+/* The buttons that kick off each page's work, filled so they stand out from
+   the housekeeping around them. Disabled they fall back to the grey above. */
+#q_search:enabled, #q_narrative_btn:enabled,
+#create_task:enabled, #launch:enabled {
+  background: var(--accent); border-color: var(--accent); color: #fff; }
+#q_search:hover:enabled, #q_narrative_btn:hover:enabled,
+#create_task:hover:enabled, #launch:hover:enabled {
+  background: #1e40af; border-color: #1e40af; }
+
+/* Each control group in a card of its own, so the panel reads as groups
+   rather than as one wall of checkboxes. */
+.controls { display: flex; flex-wrap: wrap; align-items: flex-start;
+            gap: 1rem; margin-bottom: 1rem; }
+/* Every card on one ground. A card is a group, not a state, and its heading
+   already names it — colour here would be decoration competing with the
+   controls inside. It is spent where it does work instead: on a tab bar, where
+   it says which of several panes is open (.tab-bar below). */
+.col { min-width: 240px; background: #fafafa; border: 1px solid #e7e7ea;
+       border-radius: .6rem; padding: .8rem 1rem 1rem; }
+/* The landscape panel is six cards of very different heights, and a wrapping
+   flex row leaves the tallest alone on a second line, pushing the plot off
+   screen. Columns pack them instead: the browser fills each column in turn,
+   balances the heights, and drops to fewer columns as the window narrows.
+   The other panels are two or three cards and stay the row above. */
+#landscape-controls { display: block; columns: 22rem; column-gap: 1rem;
+                      margin-bottom: 0; }
+#landscape-controls > .col { break-inside: avoid; margin-bottom: 1rem;
+                             max-width: 26rem; }
+.col b { display: block; margin-bottom: .5rem; font-size: .75rem; font-weight: 600;
+         text-transform: uppercase; letter-spacing: .05em; color: #666; }
+/* The OpenRouter catalogue, kept quiet next to the card title it follows —
+   and kept out of the title's uppercase. */
+.models-link { font-size: .75rem; font-weight: normal; margin-left: .5rem;
+               text-transform: none; letter-spacing: 0; }
+.col label { display: block; margin: .25rem 0; font-size: .9rem; }
+.col label.num span { display: inline-block; width: 130px; }
+.col input[type=number] { width: 5.5rem; }
+/* Inside a card, the second family of the same kind opens a block of its
+   own — a hairline rather than a title, the switch under it already names it. */
+.col hr.split { border: none; border-top: 1px solid var(--rule);
+                margin: .7rem 0 .5rem; }
+/* An overlay's colour on its own switch, the dot the drawn-token table uses:
+   the plot's legend tells these families apart by colour, so the card shows
+   the colour instead of spelling it out. The tooltip still names it. */
+.swatch { display: inline-block; width: .6em; height: .6em;
+          border-radius: 50%; vertical-align: baseline; }
+/* The auto buttons on the top-K boxes: pressed, the box follows the
+   component's 3σ tail; typing in the box releases it. */
+button.auto { font-size: .7rem; padding: .1rem .45rem; margin: 0 0 0 .35rem;
+              border-radius: 999px; color: #444; }
+button.auto.on:not(:disabled) { background: var(--accent);
+                                border-color: var(--accent); color: #fff; }
+fieldset { border: none; padding: 0; margin: .25rem 0; font-size: .9rem; }
+/* Settings that only exist because of the choice above them: indented and
+   tied to it by a rule, so the panel shows the dependency the JS enforces. */
+.sub { margin: .1rem 0 .35rem .6rem; padding-left: .8rem;
+       border-left: 2px solid var(--rule); }
+.sub label.num span { width: 110px; }
+fieldset legend { padding: 0; margin-bottom: .15rem; }
+/* The run pages' word source: one card with tabs. The tab bar is the choice —
+   centroid search, strong words, extreme words — and only the chosen pane is
+   on screen; the other sources' settings leave with their tab rather than
+   grey out. The active tab joins its pane folder-style, and its label is
+   typeset like the card titles it stands in for. */
+.tab-bar { display: flex; gap: .25rem; padding: 0 .6rem; }
+.tab-bar label { padding: .4rem .9rem .45rem; font-size: .75rem; font-weight: 600;
+                 text-transform: uppercase; letter-spacing: .05em; color: #666;
+                 border: 1px solid transparent; border-bottom: none;
+                 border-radius: .6rem .6rem 0 0; cursor: pointer;
+                 position: relative; z-index: 1; margin-bottom: -1px;
+                 user-select: none; }
+.tab-bar label:hover { color: #1a1a1a; }
+/* A tab wears the colour of the family it opens, on the bar that joins it to
+   its pane — the same colours the plot's legend and the swatches use, so the
+   word source's tabs are read off the plot rather than off a key. A tab whose
+   family has no colour of its own keeps the interactive accent. */
+.tab-bar label { --tab: var(--accent); }
+.tab-bar label:has(input[value="strong words"])  { --tab: var(--strong); }
+.tab-bar label:has(input[value="extreme words"]) { --tab: var(--extreme); }
+.tab-bar label:has(input[value="frames"])        { --tab: var(--frames); }
+.tab-bar label:has(input:checked) { background: var(--pane, #fafafa);
+                                    border-color: var(--pane-edge, #e7e7ea);
+                                    color: #1a1a1a;
+                                    box-shadow: inset 0 2px 0 var(--tab); }
+.tab-bar label:has(input:focus-visible) { outline: 2px solid var(--accent);
+                                          outline-offset: 1px; }
+/* The radio stays in the DOM for collect() and the keyboard, invisible. */
+.tab-bar input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.tab-pane { display: flex; flex-wrap: wrap; gap: 0 2.5rem;
+            background: var(--pane, #fafafa);
+            border: 1px solid var(--pane-edge, #e7e7ea);
+            border-radius: .6rem; padding: .8rem 1rem 1rem; }
+/* The pane under a coloured tab is tinted to match it, so the card as a whole
+   says which family is open — the tab alone is a thin line, and the settings
+   are the part being read. The word source names its panes and can say so
+   directly; the prompt set has one pane under both its tabs, so the card is
+   asked which tab is checked. */
+#pane_strong  { --pane: #fdf6f1; --pane-edge: #ecd9cb; }
+#pane_extreme { --pane: #fdf2f8; --pane-edge: #f6d3e6; }
+.tab-card:has(input[value="frames"]:checked) { --pane: #eefaf8;
+                                               --pane-edge: #c6e7e2; }
+.tab-pane[hidden] { display: none; }
+/* Inside a pane the shared control columns lose their own card chrome: the
+   pane is the card. */
+.tab-pane .col { background: none; border: none; padding: 0; min-width: 220px; }
+/* The bulk page's prompt-set pane holds five columns where the word source's
+   hold two, so it wraps — and a wrapped row needs the gap between rows that
+   .controls gives the panels this one stands in for. */
+#prompts-pane, #tweet-controls.tab-pane { gap: 1.2rem 2.5rem; }
+/* The comparison page's holds two blocks that stack rather than columns that
+   sit side by side — the retrieval settings, then the three agent tables, each
+   already laid out by a rule of its own. The pane only draws the card round
+   them. */
+#judges-pane { display: block; }
+.tab-pane .hint { margin: 0 0 .6rem; font-size: .75rem; color: #666;
+                  max-width: 30rem; }
+#status { color: #666; font-size: .9rem; min-height: 1.2em; margin: .5rem 0; }
+#error { color: #b91c1c; white-space: pre-wrap; font-family: monospace; font-size: .8rem; }
+#plot { max-width: 100%; height: auto; }
+#plot.stale { opacity: .35; }
+#tables { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 1rem; }
+#tables h3 { font-size: .95rem; margin: 0 0 .3rem; }
+/* The per-phase word tables all three pages show, in the controls' card
+   idiom: the phase as title, the centroid line under it, then a row per word
+   or per group of similar words. Keyed on the class rather than the
+   container, though every page names the container #tables. */
+.phase-card { background: #fafafa; border: 1px solid #e7e7ea;
+              border-radius: .6rem; padding: .8rem 1rem 1rem;
+              min-width: 240px; max-width: 28rem; }
+.phase-card .meta { margin: 0 0 .5rem; font-size: .75rem; color: #666; }
+.phase-card ul { list-style: none; margin: 0; padding: 0; }
+.phase-card li { display: flex; align-items: baseline; gap: .5rem;
+                 font-size: .85rem; padding: .2rem 0;
+                 border-bottom: 1px solid var(--rule); }
+.phase-card li:last-child { border-bottom: none; }
+.phase-card li small.cohesion { margin-left: auto; color: #71717a;
+                                font-size: .7rem; white-space: nowrap; }
+/* A grouped row's tweet count, on the row beside its cohesion pair — the
+   count of tweets close to the joined query, in the chips' tweet shade. */
+.phase-card li > small.tweets { color: #52525b; font-size: .7rem;
+                                white-space: nowrap; margin-left: .35rem; }
+/* The × that drops a row, on the pages whose list is edited: pushed to the
+   far edge, or just clear of the row numbers when there are any. */
+.phase-card li button.drop { margin: 0 0 0 auto; padding: 0 .35rem; line-height: 1.3; }
+.phase-card li small + button.drop { margin-left: .35rem; }
+/* Horizontal rules only: the row is the unit being read, and the grade
+   colours and group borders already carry the vertical structure. */
+table.dataframe { border-collapse: collapse; font-size: .85rem; }
+table.dataframe th, table.dataframe td { border: none; padding: .3rem .6rem;
+  border-bottom: 1px solid var(--rule); text-align: left; }
+table.dataframe thead th { background: #f7f7f8; font-weight: 600; color: #444;
+  border-bottom: 1px solid var(--border); }
+input:disabled + span, select:disabled + span,
+label:has(input:disabled), label:has(select:disabled) { color: #999; }
+/* Why a run stopped, under its status cell — the last line of the stored
+   error; the full traceback stays on the row's tooltip. */
+td .run-error { color: #b91c1c; font-size: .75rem; max-width: 26ch; }
+/* The component-value scale, wherever a token's value is shown — the
+   landscape page's token table, and the value on a strong/extreme word chip.
+   Four steps each way from a neutral middle, at |z| = .5, 1, 2 and 3: green
+   towards the component's direction, red away from it. Flat shades rather
+   than a gradient, as in the task view, and all of them light enough to read
+   black text on. */
+.lvl0 { background: #f5f5f5; }
+.g1 { background: #dcfce7; }  .r1 { background: #fee2e2; }
+.g2 { background: #bbf7d0; }  .r2 { background: #fecaca; }
+.g3 { background: #86efac; }  .r3 { background: #fca5a5; }
+.g4 { background: #4ade80; }  .r4 { background: #f87171; }
+/* The value a strong/extreme chip carries, as a small pill of that scale —
+   darker than the chip's other numbers, which sit on no ground of their own. */
+.chips span small.ica { padding: 0 .3em; border-radius: .25rem; color: #3f3f46; }
+/* A grade against its floor, wherever one is shown. */
+.ok { background: #dcfce7; }
+.bad { background: #fee2e2; }
+/* A summary that is a refusal: not a judgment, an absence — de-emphasised
+   in neutral grey, never in the green/red the grades judge with. */
+.none { background: #f3f4f6; color: #6b7280; font-style: italic; }
+/* The result tables: summaries are long next to the one-number grade cells. */
+#table_box { overflow-x: auto; }
+#table_box td { white-space: pre-wrap; max-width: 60ch; vertical-align: top; }
+td button { padding: 0 .5rem; margin: 0; }
+/* Each word its own chip, so a grouped row reads as several words rather
+   than one long one. min-width lets the flex column shrink; anywhere then
+   breaks an endless hashtag chain inside its chip instead of letting it
+   spill out of the card. */
+.chips { display: flex; flex-wrap: wrap; gap: .25rem .3rem; min-width: 0; }
+.chips span { background: #f4f4f5; border: 1px solid #e7e7ea;
+              border-radius: .35rem; padding: .05rem .4rem;
+              overflow-wrap: anywhere; }
+/* The two numbers a chip carries — how near the centroid the word is, and
+   how many tweets are about it — quiet inside it, and a shade apart from
+   each other so they are not read as one. Out of the selection, so a
+   double-click on a chip takes the word alone, ready to paste. */
+.chips span small { margin-left: .3rem; color: #71717a; font-size: .7rem;
+                    user-select: none; }
+.chips span small.tweets { color: #52525b; }
+/* A row holding several words is one thing, and has to read as one: boxed
+   off the plain rows around it, tinted, and led by how many words it holds.
+   The box drops the row rule, which would make it look like two rows. */
+.phase-card li.grouped {
+  background: #eff6ff; border: 1px solid #dbeafe;
+  border-left: 3px solid var(--accent); border-radius: .4rem;
+  padding: .35rem .5rem; margin: .3rem 0; }
+li.grouped .count { color: var(--accent); font-size: .7rem; font-weight: 600; }
+/* Against the tint, the chips need their own ground back. */
+li.grouped .chips span { background: #fff; border-color: #dbeafe; }
+#q_query { width: 22rem; }
+#agent-col { min-width: 21rem; }
+#agent-col label { margin: .6rem 0; }
+#agent-col label span { display: block; margin-bottom: .15rem; }
+#agent-col input[type=text] { width: 13.5rem; }
+#q_tweets { overflow-x: auto; margin-top: 1rem; }
+#q_tweets table.dataframe td:last-child { white-space: normal; max-width: 70ch; }
+#q_narrative { max-width: 85ch; margin-top: 1rem; line-height: 1.5; }
+/* The answer as the model laid it out. A frame analysis is labelled lines —
+   FRAME, then each function, then its values one to a line — and without this
+   the browser folds the lot into one paragraph, which is how a four-part
+   analysis arrived here reading as a single run-on sentence. A narrative holds
+   no newline and is unmoved by the rule, so both prompt sets share it, exactly
+   as the task view's table does (templates/view.html). */
+#q_narrative p { background: #f7f7f8; padding: .8rem 1rem; white-space: pre-wrap;
+                 border-left: 3px solid #9a3412; border-radius: 0 .4rem .4rem 0; }
+#q_grades { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: .8rem; max-width: 85ch; }
+.grade-card { background: #f7f7f8; border-left: 3px solid var(--accent);
+              border-radius: 0 .4rem .4rem 0; padding: .6rem 1rem; flex: 1; min-width: 16rem; }
+.grade-card span { display: flex; justify-content: space-between; gap: 1rem; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: #666; }
+/* How long the model took — and, under a summary, how long it is: quiet,
+   and out of the way. */
+.timing { color: #71717a; font-size: .75rem; font-style: normal; text-transform: none; letter-spacing: 0; }
+#q_narrative .timing { margin-top: .35rem; }
+.grade-card b { font-size: 1.4rem; }
+.grade-card small { display: block; color: #444; margin-top: .2rem; line-height: 1.4; }
+.grade-card ul { margin: .5rem 0 0; padding: 0; font-size: .85rem; }
+.grade-card li { line-height: 1.4; margin: .2rem 0; list-style: none; }
+.grade-card li::before { margin-right: .4rem; }
+.grade-card li.yes::before { content: "✓"; color: #15803d; }
+.grade-card li.no::before  { content: "✗"; color: #b91c1c; }
+.grade-card li.unjudged::before { content: "?"; color: #666; }
+.grade-card button.refine { margin: .8rem 0 0; font-size: .85rem; }
+/* A spinner for as long as the status line says something: the JS already
+   writes a message while it waits and empties it when the answer is in. */
+#q_status:not(:empty), #status:not(:empty) { margin-top: .8rem; color: #444; }
+#q_status:not(:empty)::before, #status:not(:empty)::before {
+  content: ""; display: inline-block; width: .8em; height: .8em;
+  margin-right: .5em; vertical-align: -.05em; border-radius: 50%;
+  border: 2px solid #ccc; border-top-color: var(--accent);
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

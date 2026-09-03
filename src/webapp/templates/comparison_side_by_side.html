@@ -1,0 +1,127 @@
+{# One card per word, one column per agent: the answers to the same tweets, read
+   against each other. The tweets they were written from are fetched on demand
+   — the run stored the summaries, not the corpus they came from. #}
+{% extends "_results_page.html" %}
+
+{% block title %}{{ view_title | default("Comparison " ~ run_id ~ " side by side") }}{% endblock %}
+
+{% block style %}
+<style>
+  .card { border: 1px solid #ddd; border-radius: 4px; margin: 0 0 1.5rem;
+          padding: .8rem 1rem 1rem; max-width: 100rem; }
+  .card > h2 { font-size: 1rem; margin: 0 0 .1rem; display: flex;
+               align-items: baseline; gap: .6rem; flex-wrap: wrap; }
+  .card > h2 i { font-style: normal; font-size: .75rem; color: #666; }
+  .card > h2 button { font-size: .75rem; padding: .1rem .5rem; margin: 0; }
+  /* One column per agent, side by side while there is room, stacked below. */
+  .answers { display: grid; gap: 1rem; margin-top: .7rem;
+             grid-template-columns: repeat(auto-fit, minmax(26rem, 1fr)); }
+  .answer { border-left: 3px solid #1d4ed8; background: #f7f7f8;
+            padding: .6rem .9rem; }
+  .answer > b { font-size: .75rem; text-transform: uppercase;
+                letter-spacing: .05em; color: #555; font-weight: 600; }
+  .answer .text { margin: .4rem 0 0; line-height: 1.5; font-size: .9rem;
+                  white-space: pre-wrap; }
+  .answer .text.none { background: none; padding: 0; }
+  .answer .text.missing { color: #b91c1c; font-style: italic; }
+  /* The grades of one answer, on one line under it. */
+  .marks { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .6rem; }
+  .marks span { font-size: .75rem; padding: .1rem .45rem; border: 1px solid #ddd;
+                border-radius: 3px; }
+  .marks span i { font-style: normal; color: #666; margin-right: .35rem; }
+  .tweets { margin-top: .7rem; font-size: .85rem; }
+  .tweets ol { margin: .3rem 0 0; padding-left: 1.4rem; color: #333; }
+  .tweets li { margin: .1rem 0; line-height: 1.4; }
+  .tweets .miss { color: #b91c1c; }
+  /* The word the token was queried as, highlighted wherever it lands in a
+     tweet: whether it is there at all is the thing being judged. */
+  .tweets mark { background: #fde68a; }
+</style>
+{% endblock %}
+
+{% block heading %}{{ view_title | default("Comparison " ~ run_id ~ " side by side") }}
+  {% include "_nav.html" %}
+  <a href="{{ runs_base }}/{{ run_id }}/csv">CSV</a>{% endblock %}
+
+{% block blurb %}{% if not cards %}The run is still going, or it found nothing.
+  {% endif %}{% endblock %}
+
+{% block content %}
+{% for card in cards %}
+<div class="card">
+  <h2>{{ card.word }}
+    <i title="{{ 'all phases' if card.phase == 'all' else 'all phases pooled' if card.phase == 'pooled' else 'phase ' + card.phase }}">phase {{ card.phase }}</i>
+    <button class="tweets-btn" data-word="{{ card.word }}" data-phase="{{ card.phase }}">show tweets</button>
+  </h2>
+  <div class="tweets" hidden></div>
+  <div class="answers">
+    {% for answer in card.answers %}
+    <div class="answer">
+      <b>{{ answer.agent }}</b>
+      {% if answer.summary %}
+      <p class="text {{ 'none' if answer.declined }}">{{ answer.summary }}</p>
+      {% else %}
+      <p class="text missing">no summary — the call failed, or nothing was retrieved.</p>
+      {% endif %}
+      <div class="marks">
+        {% for mark in answer.grades %}
+        <span class="{{ mark.cls }}"><i>{{ mark.label }}</i>{{ mark.value if mark.value != "" else "—" }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block script %}
+<script src="{{ asset('tweets.js') }}"></script>
+<script>
+const RETRIEVAL = {{ retrieval | tojson }};
+
+async function showTweets(button) {
+  const box = button.closest(".card").querySelector(".tweets");
+  if (!box.hidden) { box.hidden = true; button.textContent = "show tweets"; return; }
+  box.hidden = false;
+  button.textContent = "hide tweets";
+  if (box.dataset.loaded) return;
+  box.textContent = "loading…";
+  const word = button.dataset.word;
+  try {
+    // The run's own settings, speaker restriction included — the same query
+    // the task view sends, so the tweets shown are the summaries' sources.
+    const data = await fetchStoredTweets(RETRIEVAL, word, button.dataset.phase);
+    const tweets = data.tweets || [];
+    box.replaceChildren();
+    // Whether the queried word is in the tweets at all is the thing worth
+    // seeing: it is what separates a summary that can be grounded from one
+    // that cannot.
+    const hits = tweets.filter(t => t.toLowerCase().includes(word.toLowerCase())).length;
+    const note = document.createElement("div");
+    note.textContent = tweets.length
+      ? `${tweets.length} tweets — ${hits} contain "${word}".`
+      : (data.note || "no tweets retrieved.");
+    if (tweets.length && !hits) note.className = "miss";
+    const list = document.createElement("ol");
+    for (const tweet of tweets) {
+      const li = document.createElement("li");
+      // textContent first, so a tweet can never inject markup; the highlight
+      // is then put in around the plain text that is already there.
+      li.textContent = tweet;
+      li.innerHTML = li.innerHTML.replaceAll(
+        new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"),
+        m => `<mark>${m}</mark>`);
+      list.append(li);
+    }
+    box.append(note, list);
+    box.dataset.loaded = "1";
+  } catch (e) {
+    box.textContent = String(e);
+  }
+}
+
+document.querySelectorAll(".tweets-btn").forEach(b =>
+  b.addEventListener("click", () => showTweets(b)));
+</script>
+{% endblock %}

@@ -1,0 +1,40 @@
+[project]
+name = "ica"
+version = "0.1.0"
+description = "Interactive landscape of the ICA components of a tweet corpus, with LLM narratives"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "adjusttext>=1.0",
+    "flask>=3.1.3",
+    "gensim>=4.4.0",
+    "matplotlib>=3.11.0",
+    "numpy>=2.0,<2.5",
+    "openai>=2.45.0",
+    "pandas>=3.0.3",
+    "python-dotenv>=1.0",
+    "scikit-learn>=1.5",
+    "scipy>=1.14",
+    "sentence-transformers>=5.6.0",
+    "torch>=2.13.0",
+    "umap-learn>=0.5.6",
+    "waitress>=3.0.2",
+]
+
+# Notebook tooling only; the Docker image installs with --no-dev and skips it.
+[dependency-groups]
+dev = [
+    "ipykernel>=7.3.0",
+    "ipywidgets>=8.1.8",
+]
+# torch defaults to its CUDA build on Linux, which drags in ~15 NVIDIA wheels
+# (cublas, cudnn, nccl, ...) and several GB. Nothing here runs on a GPU: the
+# web app and the notebooks only ever encode on CPU, and the one GPU job
+# (rag/encode_corpus) runs on Colab, which brings its own torch.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }

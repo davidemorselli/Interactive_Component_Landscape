@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{# One page for both sets of prompts. The tab bar leading Narrative & grading
+   is the choice (bulk_page.PROMPT_SETS), and everything that follows from it —
+   the word budgets named in the tooltips, the endpoints the tasks below are
+   filed with and polled from — is swapped by the script, which reads the set
+   out of PAGE. The heading is not one of them: it names the page, and the tab
+   bar under it says which set the page is on. #}
+<title>{{ page_title }}</title>
+<link rel="stylesheet" href="{{ asset('style.css') }}">
+<style>
+  #tasks_box { margin-top: 1rem; overflow-x: auto; }
+  /* Wide enough that a narrow window scrolls the box instead of wrapping
+     every column down to a word — the summary column above all. */
+  #tasks_table { min-width: 72rem; }
+  /* The summary of summaries is a full paragraph among short cells. */
+  #tasks_table td { vertical-align: top; }
+  #tasks_table td.merge { white-space: pre-wrap; max-width: 60ch; font-size: .85rem; }
+  #tasks_table td.count { text-align: right; }
+  /* The top header row names what the columns under it belong to, and is kept
+     quiet so it reads as a label over them rather than as a column of its own. */
+  #tasks_table thead th[colspan] { text-align: center; font-weight: normal;
+                                   font-size: .75rem; color: #666;
+                                   text-transform: uppercase; letter-spacing: .05em; }
+</style>
+</head>
+<body>
+{% import "_agents.html" as ui with context %}
+{% import "_word_controls.html" as wc %}
+<h1>{{ page_title }} {% include "_nav.html" %}</h1>
+
+{% include "_words.html" %}
+
+<hr>
+<h2>Narrative &amp; grading</h2>
+
+{# The prompt set first, as the card the word source above is already chosen
+   in: the tab bar is the choice, and everything under it — these controls and
+   the tasks below them — is read in the light of it. One pane, shown under
+   both tabs, because the two sets are run with the same settings; what the
+   tab changes is which prompts they are spent on and, with them, which tasks
+   the table below lists. #}
+<div class="tab-card">
+  {{ ui.prompt_tabs(prompt_sets, default_prompt_set,
+                    "the task is written and graded with") }}
+  <div class="tab-pane" id="prompts-pane">
+    {{ wc.retrieval_col(d, "b_") }}
+
+    {# One box per role, spent on both levels of the run: the same writer
+       writes a word's summary and the summary of all of them, and the same
+       graders grade both. They were two columns of three, and the second was
+       filled in to match the first every time — the levels differ in what
+       they are given to read, not in what should read it. #}
+    <div class="col" id="agent-col">
+      <b>Agent {{ ui.models_link() }}</b>
+      {{ ui.agent_row("a_summary", "Model for summary writing") }}
+      {{ ui.agent_row("a_acueval", "Model for ACUEval grading") }}
+      {{ ui.agent_row("a_rubric", "Model for RUBRIC grading") }}
+    </div>
+
+    <div class="col">
+      <b>Refinement</b>
+      <label><input type="checkbox" id="rubric_refine"> Refine if RUBRIC average &lt;
+        <input type="number" id="rubric_threshold" value="4" min="1" max="5" step="0.1" disabled></label>
+      <label><input type="checkbox" id="acueval_refine"> Refine if ACUEval score &lt;
+        <input type="number" id="acueval_threshold" value="0.8" min="0" max="1" step="0.05" disabled></label>
+      <label id="budget_refine_label" title="">
+        <input type="checkbox" id="budget_refine" checked> Refine if summary too long</label>
+      <label class="num"><span>Max attempts per grader</span>
+        <input type="number" id="max_attempts" value="1" min="1" max="10" disabled></label>
+    </div>
+  </div>
+</div>
+
+<hr>
+<h2>Tasks</h2>
+
+<button id="create_task" disabled>Create task</button>
+<div id="t_error" style="color:#b91c1c"></div>
+<div id="tasks_box">
+  <table class="dataframe" id="tasks_table">
+    <thead>
+      <tr><th rowspan="2">id</th><th rowspan="2">name</th>
+          <th rowspan="2">created (UTC)</th><th rowspan="2">status</th>
+          <th rowspan="2">progress</th>
+          <th colspan="3" title="What the words yielded. The three add up to the words the task has got through, and it is the narratives — not the done/total beside them — that say how much of the component the task has anything to say about.">coverage</th>
+          <th colspan="3" id="merge_head" title="The one narrative written from this task's narratives, and the grades it was given. These are the grades of that summary of summaries alone, not an average over the words: the per-word grades are on the task's own page.">summary of summaries</th>
+          <th rowspan="2"></th><th rowspan="2"></th><th rowspan="2"></th></tr>
+      <tr><th title="words the messages had something to say about">narratives</th>
+          <th title="words the messages did not discuss, so no narrative was written">refusals</th>
+          <th title="words that produced nothing: no tweets retrieved, or the writer answered nothing">failed</th>
+          <th>text</th>
+          <th title="RUBRIC grade of the summary of summaries, green from {{ floors.rubric }} up">RUBRIC</th>
+          <th title="ACUEval grade of the summary of summaries, green from {{ floors.acue }} up">ACUEval</th></tr>
+    </thead>
+    <tbody id="tasks_body"></tbody>
+  </table>
+</div>
+
+<script>const PAGE = {{ page_json | tojson }};</script>
+<script src="{{ asset('shared.js') }}"></script>
+<script src="{{ asset('runs.js') }}"></script>
+<script src="{{ asset('bulk.js') }}"></script>
+</body>
+</html>
